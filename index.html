@@ -1,0 +1,334 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>JS</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+	<div id="app" class="container" v-cloak>  <!-- v-cloak не отображает отмеченные элементы, пока контент не загрузится-->
+		<div class="toolbar">
+			<a href=""
+				v-on:click.prevent="showList()"
+				v-bind:class="{active: screen === 'list'}"
+				>Items</a>
+			<a href="" 
+				v-on:click.prevent="showForm($event)"
+				v-bind:class="{active: screen === 'form'}"
+				v-if="mode === 'creating'"
+				>Add item</a>
+			<a href="" 
+				v-on:click.prevent="editItem(task)"
+				v-bind:class="{active: screen === 'form'}"
+				v-if="mode === 'editing'"
+				>Edit item</a>
+		</div>
+
+		<div class="item-form" v-if="screen === 'form'">
+			<form>
+				<div class="inputContainer">
+					<span>Task name:</span>
+					<input type="text" v-model="task.name">
+				</div>
+				<span v-if="errors.name" class="danger">  {{errors.name}}</span>
+
+				<div class="inputContainer">
+					<span>Description:</span>
+					<textarea v-model="task.description"></textarea>
+				</div>
+				<span v-if="errors.description" class="danger"> {{errors.description}} </span>
+
+				<div class="inputContainer">
+					<span>Type:</span>
+					<select v-model="task.type">
+						<option v-for="(label, key) in types" v-bind:value="key"> {{label}} </option>
+					</select>
+				</div>
+				<span v-if="errors.type" class="danger">  {{errors.type}}</span>	
+
+				<div class="inputContainer">
+					<span>Urgency:</span>
+					<label  v-for="(key,index) in urgencyMessages" ><input type="radio" v-bind:value="index" v-model="task.urgency"><span>{{key}}</span></label>
+				</div>
+				<span v-if="errors.urgency" class="danger">  {{errors.urgency}}</span>
+			
+				<div class="inputContainer">
+					<label class="prioContainer">
+						<span>Is prio?</span>
+						<input type="checkbox" v-model="task.prio"> {{ task.prio | prio }}
+					</label>
+				</div>
+
+				<div class="inputContainer">
+					<button type="button" v-on:click="addItem()" v-if="mode === 'creating'">create</button>
+					<button type="button" v-on:click="saveItem()" v-if="mode === 'editing'">save</button>
+				</div>
+			</form>
+		</div>
+
+		<div class="todolist" v-if="screen === 'list'">
+			<div class="listContainer" v-if="items.length">
+				<div class="sortContainer">
+					<label class="prioContainer">
+						<span>Prio</span>
+						<input type="checkbox" v-model="sorting.prio" > {{ sorting.prio | prio }}
+					</label>
+					<div>
+						<span>Sort by: </span>
+						<label>
+							<input type="radio" value="urgency" v-model="sorting.sort"> Urgency
+						</label>
+						<label>
+							<input type="radio" value="date" v-model="sorting.sort"> Date
+						</label>
+					</div>
+					<label><input type="text" v-model="sorting.query"></label>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Done?</th>
+							<th>Created</th>
+							<th>Is Prio?</th>
+							<th>Urgency</th>
+							<th>Name</th>
+							<th>Type</th>
+							<th>Desc</th>
+							<th>Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="(item, index) in sorted">
+							<td class="index"> {{ index + 1 }} </td>
+							<td class="completion">
+								<span class="done" v-on:click="makeDone(item)">{{ item.done ? '✅' : '⬜'}}</span>
+							</td>
+							<td class="created_at"> {{ convertDate(item) }} </td>
+							<td class="prio"> {{ item.prio | prio }} </td>
+							<td class="urgency"> {{ urgencyMessages[item.urgency] }} </td>
+							<td class="name"> {{ item.name }} </td>
+							<td class="type">
+								<span v-for="(name, type) in types" v-text="name" v-if="item.type === type"></span>
+							</td>
+							<td class="desc"> <p class="description">{{ item.description }}</p></td>
+							<td class="actions">
+								<button type="button" v-on:click="editItem(item)">edit</button>
+								<button type="button" v-on:click="delItem(index)">del</button>
+							</td>
+						</tr>
+						
+					</tbody>
+				</table>
+			</div>
+			
+			<div v-else>
+				<p> no items! </p>
+			</div>
+		</div>
+	</div>
+
+
+	<script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+
+	<script>
+		
+		new Vue({
+			el: "#app",
+			data: {
+				types: {
+					call: 'Call',
+					meeting: 'Meeting',
+					task: 'Task',
+					other: 'Other'
+				},
+				screen: 'list',
+				mode: 'creating',
+				editingItem: {},
+				errors: {},
+				task: {
+					created_at:'',
+					name:'',
+					description:'',
+					type: '',
+					urgency: '',
+					prio: false,
+					done: false,
+				},
+				sorting: {
+					prio: false,
+					sort: 'date',
+					query: '',
+				},
+				urgencyMessages: ['Urgent','Not really',"Don't worry"],
+				items: [
+					
+				]
+			},
+			filters: {
+				prio: function(value)
+				{
+					return value ? '📌' : '';
+				}
+			},
+			mounted() {
+			    if (localStorage.getItem('items')) {
+				    try {
+				    	this.items = JSON.parse(localStorage.getItem('items'));
+				    } catch(e) {
+				    	localStorage.removeItem('items');
+				    }
+				}
+  			},
+			watch: {
+				screen: function() {
+					console.log(this.screen);
+				}
+			},
+			computed: {
+			  sorted: function () {
+			  	sorted = this.items;
+			  	if (this.sorting.prio){
+			  		sorted = sorted.filter(function(item){
+			  			if (item.prio){
+			  				return item;
+			  			}
+			  		});
+			  	}
+
+			  	if (this.sorting.sort === 'date'){
+			  		sorted = sorted.sort(function(item1,item2){
+			  			return item2.created_at - item1.created_at;
+			  		});
+			  	}
+			  	if (this.sorting.sort === 'urgency'){
+			  		sorted = sorted.sort( function(item1,item2){
+			  			return item1.urgency - item2.urgency;
+			  		});
+			  	}
+
+			  	if (this.sorting.query.length > 0){
+			  		var query = this.sorting.query;
+			  		sorted = sorted.filter(function(item){
+			  			if (item.name.toLowerCase().indexOf(query) != -1) {
+							return item;
+						}
+			  		});
+			  	}
+
+			    return sorted;
+			  }
+			},
+			methods: {
+				getNow: function() {
+                    return Date.now();
+                },
+                convertDate: function(item) {
+                	return new Date(item.created_at).toLocaleString();
+                },
+				saveItemsToStorage() {
+      				const parsed = JSON.stringify(this.items);
+      				localStorage.setItem('items', parsed);
+    			},
+				validateTask: function(item){
+					this.errors =  {};
+
+					if (!this.task.name)
+					{
+						this.errors.name = " Name field is required";
+					}
+					if (!this.task.type){
+						this.errors.type = ' Choose a type'
+					}
+					if (!this.task.description){
+						this.errors.description = ' Input an appropriate description'
+					}
+					if (this.task.urgency === ''){
+						this.errors.urgency = ' Select how urgent the task is'
+					}
+
+					if (Object.keys(this.errors).length > 0){
+						return false
+					}
+
+					return true
+				}
+				,
+				showForm: function(e) {
+					this.screen = 'form';
+					this.mode = 'creating';
+					this.task = {
+							name: '',
+							description: '',
+							type: '',
+							urgency: '',
+							prio: false,
+							done: false,
+						};
+				},
+				showList: function(e) {
+					this.screen = 'list';
+					this.mode = 'creating';
+				},
+				updateList: function() {
+					if (this.task.name){
+						Object.assign(this.editingItem, this.task);
+						this.editingItem = {};
+						this.showList();
+					}
+				},
+				addItem: function() {
+					if (!this.validateTask()){
+						return
+					}
+
+					this.task.created_at = this.getNow();
+					this.items.push(this.task);
+
+					this.saveItemsToStorage();
+
+					this.task = {
+						created_at: '',
+						name: '',
+						description: '',
+						type: '',
+						urgency: '',
+						prio: false,
+						done: false,
+					};
+					this.showList();
+					
+				},
+				saveItem: function() {
+					if (!this.validateTask()){
+						return
+					}
+
+					Object.assign(this.editingItem, this.task);
+					this.editingItem = {};
+					this.showList();
+					this.saveItemsToStorage();
+				},
+				makeDone: function(item) {
+					item.done = !item.done;
+					this.saveItemsToStorage();
+				},
+				editItem: function(item) {
+					this.showForm();
+					this.editingItem = item;
+					this.task = Object.assign({}, item);
+					this.mode = 'editing';
+				},
+				delItem: function(index) {
+					this.items.splice(index, 1);
+					this.saveItemsToStorage();
+				}
+			}
+
+		});
+			
+	</script>
+</body>
+</html>
