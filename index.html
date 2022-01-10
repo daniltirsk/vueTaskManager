@@ -8,7 +8,7 @@
 </head>
 <body>
 
-	<div id="app" class="container" v-cloak>  <!-- v-cloak не отображает отмеченные элементы, пока контент не загрузится-->
+	<div id="app" class="container" v-cloak>
 		<div class="toolbar">
 			<a href=""
 				v-on:click.prevent="showList()"
@@ -24,6 +24,9 @@
 				v-bind:class="{active: screen === 'form'}"
 				v-if="mode === 'editing'"
 				>Edit item</a>
+			<a href="" 
+				v-on:click.prevent="clearStorage"
+				>Clear Storage</a>
 		</div>
 
 		<div class="item-form" v-if="screen === 'form'">
@@ -228,6 +231,17 @@
                 convertDate: function(item) {
                 	return new Date(item.created_at).toLocaleString();
                 },
+                clearStorage: function(){
+	                if (localStorage.getItem('items')) {
+					    try {
+					    	localStorage.removeItem('items');
+					    } catch(e) {
+					    	console.log('an error occured while wiping localStorage');
+					    }
+					}
+                }
+                ,
+
 				saveItemsToStorage() {
       				const parsed = JSON.stringify(this.items);
       				localStorage.setItem('items', parsed);
